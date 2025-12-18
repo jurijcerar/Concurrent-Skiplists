@@ -1,0 +1,2 @@
+Threads,Duration,Total_Operations,Successful_Operations,Insert_Success,Delete_Success,Contains_Success,Throughput
+1,1.00,28529,11634,0.932100,0.062003,0.068459,28526.972656

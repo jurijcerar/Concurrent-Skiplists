@@ -1,0 +1,60 @@
+# Project: Advanced Multiprocessor Programming
+
+## Overview
+This project implements and benchmarks various skip list data structures, including sequential, global-lock, fine-grained-lock, and lock-free variants. The results are analyzed and visualized in a report that includes plots generated from the benchmarking data.
+
+## Prerequisites
+
+Before running the project, ensure the following dependencies are installed:
+
+1. **System Requirements:**
+   - `gcc` compiler with support for `-fopenmp`
+   - LaTeX distribution for compiling the report (e.g., `TeX Live` or `MiKTeX`)
+   - Python 3.x
+
+2. **Python Packages:**
+   - `pandas`
+   - `matplotlib`
+
+Install the required Python packages using:
+```bash
+pip install pandas matplotlib
+```
+
+If your system restricts package installation, create and activate a virtual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install pandas matplotlib
+```
+
+## Compilation
+
+To compile the project:
+```bash
+make all
+```
+
+## Running Benchmarks
+
+To execute the benchmarks and generate data:
+```bash
+make small-bench
+```
+
+## Running Automated Benchmarks On Nebula
+
+To execute the benchmarks and generate data:
+```bash
+run_nebula.sh project.zip small-bench
+```
+
+1. **Compile the project:**
+   ```bash
+   make all
+   ```
+2. **Run benchmarks and generate plots:**
+   ```bash
+   make small-bench
+   make small-plot
+   ```
