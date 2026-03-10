@@ -1,4 +1,4 @@
-#include "skiplist2.h"
+#include "skiplist_seq.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
@@ -29,16 +29,24 @@ SkipList *create_skiplist() {
 }
 
 // Generate a random level for a new node
-int random_level() {
+int random_level(int seed) {
+    struct random_data rand_state;
+    int choice;
+    char statebuf[32];
+    bzero(&rand_state, sizeof(struct random_data));
+    bzero(&statebuf, sizeof(statebuf));
+    initstate_r(seed, statebuf, 32, &rand_state);
+    random_r(&rand_state, &choice);
+
     int level = 0;
-    while (((double)rand() / RAND_MAX) < PROBABILITY && level < MAX_LEVEL) {
+    while (((double)choice / RAND_MAX) < PROBABILITY && level < MAX_LEVEL) {
         level++;
     }
     return level;
 }
 
 // Insert a key-value pair into the skip list
-void insert(SkipList *list, int key, int value) {
+bool insert(SkipList *list, int key, int value) {
     SkipListNode *update[MAX_LEVEL + 1];
     SkipListNode *current = list->header;
 
@@ -70,6 +78,7 @@ void insert(SkipList *list, int key, int value) {
         update[i]->forward[i] = new_node;
     }
     list->inserted_count++;
+    return true;
 }
 
 // Delete a key from the skip list

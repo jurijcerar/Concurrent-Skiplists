@@ -35,33 +35,50 @@ struct bench_result {
 int global_index = 0;
 #pragma omp threadprivate(global_index)
 
-// HELPER FUNCTIONS
-int generate_key(int start_range, int end_range, enum strategy st, int seed, int *arr) {
-    struct random_data rand_state;
-    int choice;
-    char statebuf[32];
-    bzero(&rand_state, sizeof(struct random_data));
-    bzero(&statebuf, sizeof(statebuf));
-    initstate_r(seed, statebuf, 32, &rand_state);
-    int key = 0;
+struct random_data thread_rand_state;
+char thread_rand_buf[64];
 
-    switch (st) {
+#pragma omp threadprivate(thread_rand_state, thread_rand_buf)
+
+void init_thread_rng(int seed)
+{
+    memset(&thread_rand_state, 0, sizeof(struct random_data));
+    memset(thread_rand_buf, 0, sizeof(thread_rand_buf));
+
+    initstate_r(seed, thread_rand_buf, sizeof(thread_rand_buf), &thread_rand_state);
+}
+
+// HELPER FUNCTIONS
+int generate_key(int start_range,
+                 int end_range,
+                 enum strategy st,
+                 int seed,
+                 int *arr)
+{
+    int choice;
+    int key = 0;
+    int range_size = end_range - start_range + 1;
+
+    switch (st)
+    {
         case RANDOM:
-            random_r(&rand_state, &choice);
-            key = (choice % (end_range - start_range + 1)) + start_range;
+            random_r(&thread_rand_state, &choice);
+            key = (choice % range_size) + start_range;
             break;
+
         case UNIQUE:
-            if (global_index + start_range > end_range) {
+            if (global_index >= range_size)
                 global_index = 0;
-            }
+
             key = arr[global_index];
             global_index++;
             break;
+
         case DETERMINISTIC:
-            if (global_index + start_range > end_range) {
+            if (global_index >= range_size)
                 global_index = 0;
-            }
-            key = global_index + start_range;
+
+            key = start_range + global_index;
             global_index++;
             break;
     }
@@ -87,29 +104,50 @@ void fillAndShuffleRow(int *row, int start, int end, int size) {
     }
 }
 
-void divide_range(int threads, int **ranges, int start, int end, enum key_range_type krt) {
-    int range_size = end - start;
+void divide_range(int threads,
+                  int **ranges,
+                  int start,
+                  int end,
+                  enum key_range_type krt)
+{
+    int range_size = end - start + 1;
 
-    if (krt == DISJOINT) {
+    if (krt == DISJOINT)
+    {
         int chunk = range_size / threads;
-        for (int i = 0; i < threads; i++) {
+
+        for (int i = 0; i < threads; i++)
+        {
             ranges[i][0] = start + i * chunk;
-            ranges[i][1] = (i == threads - 1) ? end : start + (i + 1) * chunk;
+
+            if (i == threads - 1)
+                ranges[i][1] = end;
+            else
+                ranges[i][1] = ranges[i][0] + chunk - 1;
         }
-    } else if (krt == PER_THREAD) {
+    }
+
+    else if (krt == PER_THREAD)
+    {
         int chunk = range_size / (threads + 1);
-        for (int i = 0; i < threads; i++) {
+
+        for (int i = 0; i < threads; i++)
+        {
             ranges[i][0] = start + i * chunk;
-            ranges[i][1] = start + (i + 2) * chunk;
-            if (ranges[i][1] > end) ranges[i][1] = end;
+            ranges[i][1] = ranges[i][0] + 2 * chunk;
+
+            if (ranges[i][1] > end)
+                ranges[i][1] = end;
         }
-    } else if (krt == COMMON) {
-        for (int i = 0; i < threads; i++) {
+    }
+
+    else if (krt == COMMON)
+    {
+        for (int i = 0; i < threads; i++)
+        {
             ranges[i][0] = start;
             ranges[i][1] = end;
         }
-    } else {
-        fprintf(stderr, "Invalid mode\n");
     }
 }
 
@@ -181,53 +219,70 @@ void bench_validate_skiplist(SkipList *sl, int successful_prefill, int successfu
 
 
 // BENCHMARK
-struct counters random_bench1(struct SkipList *sl, int seed, double duration, int *operations, int start_range, int end_range, int *arr, enum strategy strat) {
-    #pragma omp barrier
-    struct random_data rand_state;
-    int choice;
-    char statebuf[32];
-    bzero(&rand_state, sizeof(struct random_data));
-    bzero(&statebuf, sizeof(statebuf));
-    initstate_r(seed, statebuf, 32, &rand_state);
+struct counters random_bench1(struct SkipList *sl,
+                              int seed,
+                              double duration,
+                              int *operations,
+                              int start_range,
+                              int end_range,
+                              int *arr,
+                              enum strategy strat)
+{
+    init_thread_rng(seed + omp_get_thread_num());
 
-    struct counters data = {.all_operations = 0,
-                            .succ_insert = 0,
-                            .succ_delete = 0,
-                            .succ_contains = 0,
-                            .all_delete = 0,
-                            .all_contains = 0,
-                            .succ_operations = 0};
+    struct counters data = {0};
 
-    double tic = omp_get_wtime();
+    double start_time = omp_get_wtime();
     int i = 0;
-    while (duration > (omp_get_wtime() - tic)) {
-        int key = generate_key(start_range, end_range, strat, seed + i, arr);
-        random_r(&rand_state, &choice);
 
-        if (choice % 100 < operations[0]) {
-            if (insert(sl, key, seed)) {
+    while ((omp_get_wtime() - start_time) < duration)
+    {
+        int key = generate_key(start_range, end_range, strat, seed + i, arr);
+
+        int choice;
+        random_r(&thread_rand_state, &choice);
+
+        int op = choice % 100;
+
+        if (op < operations[0])                // INSERT
+        {
+            data.all_insert++;
+            data.all_operations++;
+
+            if (insert(sl, key, seed))
+            {
                 data.succ_insert++;
                 data.succ_operations++;
             }
-            data.all_insert++;
+        }
+
+        else if (op < operations[0] + operations[1])   // DELETE
+        {
+            data.all_delete++;
             data.all_operations++;
-        } else if (choice % 100 < operations[0] + operations[1] && choice % 100 >= operations[0]) {
-            if (erase(sl, key)) {
+
+            if (erase(sl, key))
+            {
                 data.succ_delete++;
                 data.succ_operations++;
             }
+        }
+
+        else                                // CONTAINS
+        {
+            data.all_contains++;
             data.all_operations++;
-            data.all_delete++;
-        } else {
-            if (contains(sl, key)) {
+
+            if (contains(sl, key))
+            {
                 data.succ_contains++;
                 data.succ_operations++;
             }
-            data.all_operations++;
-            data.all_contains++;
         }
+
         i++;
     }
+
     return data;
 }
 
@@ -260,7 +315,9 @@ struct bench_result small_bench(int threads, int prefill, double duration, int s
         fillAndShuffleRow(random_arr[i], ranges[i][0], ranges[i][1], range_size);
     }
 
-    for (int i = 0; i < prefill; i++) {
+   init_thread_rng(seed);
+
+    for (int i = 0; i < prefill; i++){
         int key = generate_key(start_range, end_range, RANDOM, seed + i, NULL);
         insert(sl, key, seed);
     }
@@ -268,9 +325,20 @@ struct bench_result small_bench(int threads, int prefill, double duration, int s
     omp_set_num_threads(threads);
     tic = omp_get_wtime();
     {
-        #pragma omp parallel for
-        for (int i = 0; i < threads; i++) {
-            thread_data[i] = random_bench1(sl, seed, duration, operations, ranges[i][0], ranges[i][1], random_arr[i], strat);
+        #pragma omp parallel
+        {
+            int tid = omp_get_thread_num();
+
+            thread_data[tid] = random_bench1(
+                sl,
+                seed,
+                duration,
+                operations,
+                ranges[tid][0],
+                ranges[tid][1],
+                random_arr[tid],
+                strat
+            );
         }
     }
     toc = omp_get_wtime();
@@ -313,6 +381,8 @@ struct bench_result small_bench(int threads, int prefill, double duration, int s
        (result.reduced_counters.all_contains > 0 ? 
            (double)result.reduced_counters.succ_contains / result.reduced_counters.all_contains : 0.0),
        (result.reduced_counters.all_operations / result.time));
+
+    destroy_skiplist(sl);
 
     return result;
 }

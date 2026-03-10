@@ -40,9 +40,17 @@ SkipList* create_skiplist() {
 }
 
 // Random level generator
-int random_level() {
+int random_level(int seed) {
+    struct random_data rand_state;
+    int choice;
+    char statebuf[32];
+    bzero(&rand_state, sizeof(struct random_data));
+    bzero(&statebuf, sizeof(statebuf));
+    initstate_r(seed, statebuf, 32, &rand_state);
+    random_r(&rand_state, &choice);
+
     int level = 0;
-    while (((double)rand() / RAND_MAX) < PROBABILITY && level < MAX_LEVEL) {
+    while (((double)choice / RAND_MAX) < PROBABILITY && level < MAX_LEVEL) {
         level++;
     }
     return level;

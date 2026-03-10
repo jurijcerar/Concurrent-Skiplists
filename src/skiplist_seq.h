@@ -1,8 +1,7 @@
-#ifndef SKIPLIST3_H
-#define SKIPLIST3_H
+#ifndef SKIPLIST_H
+#define SKIPLIST_H
 
 #include <stdbool.h>
-#include <pthread.h>
 
 #define MAX_LEVEL 16 // Maximum levels in the skip list
 #define PROBABILITY 0.5 // Probability of level promotion
@@ -18,7 +17,6 @@ typedef struct SkipListNode {
 typedef struct SkipList {
     int level; // Current maximum level of the skip list
     SkipListNode *header; // Pointer to the header node
-    pthread_mutex_t lock; // Mutex for global locking
     int prefilled_count; // Count of prefilled keys
     int inserted_count; // Count of inserted keys
     int deleted_count; // Count of deleted keys
@@ -28,13 +26,11 @@ typedef struct SkipList {
 SkipList *create_skiplist();
 void free_skiplist(SkipList *list);
 SkipListNode *create_node(int level, int key, int value);
-int random_level();
+int random_level(int seed);
 bool insert(SkipList *list, int key, int value);
 bool erase(SkipList *list, int key);
 bool contains(SkipList *list, int key);
 void prefill(SkipList *list, int count);
 bool validate(SkipList *list);
-int get_element_count(SkipList *list);
 
-
-#endif // SKIPLIST3_H
+#endif // SKIPLIST_H
