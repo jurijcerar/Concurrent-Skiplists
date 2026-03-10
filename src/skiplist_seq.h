@@ -23,14 +23,13 @@ typedef struct SkipList {
 } SkipList;
 
 // Function prototypes
-SkipList *create_skiplist();
-void free_skiplist(SkipList *list);
+SkipList *create_skiplist(int seed);
+void destroy_skiplist (SkipList *list);
 SkipListNode *create_node(int level, int key, int value);
-int random_level(int seed);
+int random_level();
 bool insert(SkipList *list, int key, int value);
 bool erase(SkipList *list, int key);
 bool contains(SkipList *list, int key);
-void prefill(SkipList *list, int count);
-bool validate(SkipList *list);
+int get_element_count(SkipList *list);
 
 #endif // SKIPLIST_H

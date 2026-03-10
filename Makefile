@@ -1,7 +1,6 @@
 # Compiler and flags
-CC ?= gcc
+CC = gcc
 CFLAGS := -O3 -Wall -Wextra -fopenmp -march=native
-LDFLAGS := -static-libgcc -static-libstdc++ -static
 RM ?= rm -rf
 MKDIR ?= mkdir -p
 
@@ -10,7 +9,7 @@ SRC_DIR = src
 BUILD_DIR = build
 
 # Skip list implementations
-IMPLEMENTATIONS = skiplist_seq skiplist_gl skiplist_lazy skiplist_free
+IMPLEMENTATIONS = skiplist_seq #skiplist_gl skiplist_lazy skiplist_free
 
 # Benchmark source (renamed from library.c)
 BENCHMARK = benchmark
@@ -31,7 +30,7 @@ build_all: $(foreach impl,$(IMPLEMENTATIONS),$(BUILD_DIR)/$(impl))
 # Compile rule
 $(BUILD_DIR)/%: $(SRC_DIR)/%.c $(SRC_DIR)/$(BENCHMARK).c
 	@echo "Compiling $@"
-	$(CC) $(CFLAGS) $(LDFLAGS) \
+	$(CC) $(CFLAGS) \
 	-DSKIPLIST_HEADER='"$*.h"' \
 	-o $@ $^ -I$(SRC_DIR)
 

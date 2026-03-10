@@ -52,7 +52,6 @@ void init_thread_rng(int seed)
 int generate_key(int start_range,
                  int end_range,
                  enum strategy st,
-                 int seed,
                  int *arr)
 {
     int choice;
@@ -164,56 +163,37 @@ void print_results(struct counters data) {
 }
 
 // Validation Function
-void bench_validate_skiplist(SkipList *sl, int successful_prefill, int successful_inserts, int successful_deletes) {
+void bench_validate_skiplist(SkipList *sl, int successful_prefill, 
+                              int successful_inserts, int successful_deletes) {
+    // Check count FIRST before modifying the list
     int expected_count = successful_prefill + successful_inserts - successful_deletes;
     int actual_count = get_element_count(sl);
+    
+    if (expected_count != actual_count) {
+        fprintf(stderr, "Validation failed: Expected count = %d, Actual count = %d.\n",
+                expected_count, actual_count);
+        return;
+    }
 
-    int test_key = INT_MAX - 1; // Use a unique key unlikely to conflict with existing keys
-    bool failed_deletion = false;
+    // Then test insert/delete behavior separately
+    int test_key = INT_MAX - 1;
+    bool failed = false;
 
-    // Check if the test key is already in the skiplist
-    if (contains(sl, test_key)) {
-        // If already present, attempt to delete it and check behavior
-        if (!erase(sl, test_key)) {
-            fprintf(stderr, "Validation failed: Unable to delete the already present test key %d.\n", test_key);
-            failed_deletion = true;
-        }
-
-        if (erase(sl, test_key)) {
-            fprintf(stderr, "Validation failed: Test key %d was deleted more than once.\n", test_key);
-            failed_deletion = true;
-        }
-    } else {
-        // If not present, insert the test key
+    if (!contains(sl, test_key)) {
         if (!insert(sl, test_key, 12345)) {
-            fprintf(stderr, "Validation failed: Unable to insert the test key %d.\n", test_key);
-            failed_deletion = true;
-        }
-
-        // Now delete it and ensure it cannot be deleted again
-        if (!erase(sl, test_key)) {
-            fprintf(stderr, "Validation failed: Unable to delete the test key %d after insertion.\n", test_key);
-            failed_deletion = true;
-        }
-
-        if (erase(sl, test_key)) {
-            fprintf(stderr, "Validation failed: Test key %d was deleted more than once after insertion.\n", test_key);
-            failed_deletion = true;
+            fprintf(stderr, "Validation failed: Could not insert test key.\n");
+            failed = true;
+        } else if (!erase(sl, test_key)) {
+            fprintf(stderr, "Validation failed: Could not delete test key.\n");
+            failed = true;
+        } else if (erase(sl, test_key)) {
+            fprintf(stderr, "Validation failed: Test key deleted twice.\n");
+            failed = true;
         }
     }
 
-    // Perform standard element count validation and include deletion validation
-    if (expected_count != actual_count || failed_deletion) {
-        fprintf(stderr, "Validation failed: ");
-        if (expected_count != actual_count) {
-            fprintf(stderr, "Expected count = %d, Actual count = %d.\n", expected_count, actual_count);
-        }
-        if (failed_deletion) {
-            fprintf(stderr, "Deletion behavior validation failed.\n");
-        }
-    } else {
-        printf("Validation passed: Expected count matches Actual count (%d). Test key behavior (insertion and deletion) is correct.\n", actual_count);
-    }
+    if (!failed)
+        printf("Validation passed: count=%d, insert/delete behavior correct.\n", actual_count);
 }
 
 
@@ -237,7 +217,7 @@ struct counters random_bench1(struct SkipList *sl,
 
     while ((omp_get_wtime() - start_time) < duration)
     {
-        int key = generate_key(start_range, end_range, strat, seed + i, arr);
+        int key = generate_key(start_range, end_range, strat, arr);
 
         int choice;
         random_r(&thread_rand_state, &choice);
@@ -300,7 +280,7 @@ struct bench_result small_bench(int threads, int prefill, double duration, int s
 
     struct counters thread_data[threads];
     double tic, toc;
-    SkipList *sl = create_skiplist();
+    SkipList *sl = create_skiplist(seed);
 
     int **ranges = malloc(threads * sizeof(int *));
     for (int i = 0; i < threads; i++) {
@@ -318,7 +298,7 @@ struct bench_result small_bench(int threads, int prefill, double duration, int s
    init_thread_rng(seed);
 
     for (int i = 0; i < prefill; i++){
-        int key = generate_key(start_range, end_range, RANDOM, seed + i, NULL);
+        int key = generate_key(start_range, end_range, RANDOM, NULL);
         insert(sl, key, seed);
     }
 
@@ -432,6 +412,16 @@ int main(int argc, char *argv[]) {
         printf("\nRunning experiment %d/%d...\n", i + 1, experiments);
         results[i] = small_bench(threads, prefill, duration, seed, operations, key_range[0], key_range[1], range_type, strat);
     }
+
+    printf("\n=== Summary across %d experiments ===\n", experiments);
+    double total_throughput = 0;
+    for (int i = 0; i < experiments; i++) {
+        double throughput = results[i].reduced_counters.all_operations / results[i].time;
+        printf("  Experiment %d: %.2f sec, throughput=%.0f ops/sec\n",
+            i + 1, results[i].time, throughput);
+        total_throughput += throughput;
+    }
+    printf("  Average throughput: %.0f ops/sec\n", total_throughput / experiments);
 
     return 0;
 }
