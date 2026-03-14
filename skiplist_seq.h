@@ -1,11 +1,28 @@
+#ifndef SKIPLIST_SEQ_H
+#define SKIPLIST_SEQ_H
+
 #define _GNU_SOURCE
-#include "skiplist_seq.h"
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <search.h>
 #include <time.h>
 #include <stdio.h>
+
+#define SKIPLIST_MAX_LEVEL 16
+#define SKIPLIST_P 0.5
+
+typedef struct SkipListNode {
+    int key;
+    void *value;
+    struct SkipListNode **forward;
+} SkipListNode;
+
+typedef struct SkipList {
+    int level;
+    SkipListNode *header;
+} SkipList;
 
 // Thread-safe random state
 static struct random_data rand_state;
@@ -21,7 +38,6 @@ static void skiplist_init_random(void) {
     }
 }
 
-// Generate a random level for a new node
 static int skiplist_random_level(void) {
     skiplist_init_random();
     int32_t r;
@@ -34,31 +50,25 @@ static int skiplist_random_level(void) {
     return level;
 }
 
-// Create a new node
 static SkipListNode* skiplist_create_node(int level, int key, void *value) {
     SkipListNode* node = malloc(sizeof(SkipListNode));
-    if (!node) { fprintf(stderr,"Memory allocation failed\n"); exit(EXIT_FAILURE); }
+    if (!node) { fprintf(stderr, "Memory allocation failed\n"); exit(EXIT_FAILURE); }
     node->key = key;
     node->value = value;
     node->forward = calloc(level + 1, sizeof(SkipListNode*));
-    if (!node->forward) { free(node); fprintf(stderr,"Memory allocation failed\n"); exit(EXIT_FAILURE); }
+    if (!node->forward) { free(node); fprintf(stderr, "Memory allocation failed\n"); exit(EXIT_FAILURE); }
     return node;
 }
 
-// Create an empty skiplist
-SkipList* skiplist_create(void) {
+static SkipList* skiplist_create(void) {
     SkipList* sl = (SkipList*)malloc(sizeof(SkipList));
-    if (!sl) {
-        fprintf(stderr, "Memory allocation failed for skiplist\n");
-        exit(EXIT_FAILURE);
-    }
+    if (!sl) { fprintf(stderr, "Memory allocation failed for skiplist\n"); exit(EXIT_FAILURE); }
     sl->level = 0;
     sl->header = skiplist_create_node(SKIPLIST_MAX_LEVEL - 1, INT_MIN, NULL);
     return sl;
 }
 
-// Search for a key
-void *skiplist_search(SkipList *list, int key) {
+static void *skiplist_search(SkipList *list, int key) {
     SkipListNode *current = list->header;
     for (int i = list->level; i >= 0; i--) {
         while (current->forward[i] && current->forward[i]->key < key)
@@ -69,8 +79,7 @@ void *skiplist_search(SkipList *list, int key) {
     return NULL;
 }
 
-// Insert a key-value pair
-bool skiplist_insert(SkipList *list, int key, void *value) {
+static bool skiplist_insert(SkipList *list, int key, void *value) {
     SkipListNode *update[SKIPLIST_MAX_LEVEL];
     SkipListNode *current = list->header;
     for (int i = list->level; i >= 0; i--) {
@@ -79,7 +88,7 @@ bool skiplist_insert(SkipList *list, int key, void *value) {
         update[i] = current;
     }
     current = current->forward[0];
-    if (current && current->key == key) return false; // Key exists
+    if (current && current->key == key) return false;
 
     int new_level = skiplist_random_level();
     if (new_level > list->level) {
@@ -96,8 +105,7 @@ bool skiplist_insert(SkipList *list, int key, void *value) {
     return true;
 }
 
-// Erase a key
-bool skiplist_erase(SkipList *list, int key) {
+static bool skiplist_erase(SkipList *list, int key) {
     SkipListNode *update[SKIPLIST_MAX_LEVEL];
     SkipListNode *current = list->header;
     for (int i = list->level; i >= 0; i--) {
@@ -121,8 +129,7 @@ bool skiplist_erase(SkipList *list, int key) {
     return true;
 }
 
-// Destroy the skiplist
-void skiplist_destroy(SkipList *list) {
+static void skiplist_destroy(SkipList *list) {
     SkipListNode *current = list->header;
     while (current) {
         SkipListNode *next = current->forward[0];
@@ -132,3 +139,5 @@ void skiplist_destroy(SkipList *list) {
     }
     free(list);
 }
+
+#endif // SKIPLIST_SEQ_H

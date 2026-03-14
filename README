@@ -1,60 +1,75 @@
-# Project: Advanced Multiprocessor Programming
+# Concurrent Skip List Implementations
 
-## Overview
-This project implements and benchmarks various skip list data structures, including sequential, global-lock, fine-grained-lock, and lock-free variants. The results are analyzed and visualized in a report that includes plots generated from the benchmarking data.
+Four header-only skip list implementations. Drop the `.h` into your project and include it, and you are done.
+**NOTE:** Only works on Linux, as Windows does not allow the use of initstate_r.
 
-## Prerequisites
+## Implementations
 
-Before running the project, ensure the following dependencies are installed:
+| Header | Strategy 
+|---|---|
+| `skiplist_seq.h` | Sequential (single-thread) |
+| `skiplist_gl.h` | Global lock (low parallelism) |
+| `skiplist_lazy.h` | Lazy locking |
+| `skiplist_free.h` | Lock-free (CAS + atomic mark bits) |
 
-1. **System Requirements:**
-   - `gcc` compiler with support for `-fopenmp`
-   - LaTeX distribution for compiling the report (e.g., `TeX Live` or `MiKTeX`)
-   - Python 3.x
+## API
 
-2. **Python Packages:**
-   - `pandas`
-   - `matplotlib`
+All four implementations expose the same interface:
 
-Install the required Python packages using:
-```bash
-pip install pandas matplotlib
+```c
+SkipList *skiplist_create(void);
+void      skiplist_destroy(SkipList *list);
+bool      skiplist_insert(SkipList *list, int key, void *value);
+bool      skiplist_erase(SkipList *list, int key);
+void     *skiplist_search(SkipList *list, int key);
 ```
 
-If your system restricts package installation, create and activate a virtual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install pandas matplotlib
+- `skiplist_insert` returns `true` if inserted, `false` if key already existed.
+- `skiplist_erase` returns `true` if removed, `false` if key was not found.
+- `skiplist_search` returns the stored `value` pointer, or `NULL` if not found.
+
+## Usage
+
+```c
+#include "skiplist_lazy.h"   // or any of the four headers
+
+int main(void) {
+    SkipList *sl = skiplist_create();
+
+    skiplist_insert(sl, 42, "hello");
+    skiplist_insert(sl, 99, "world");
+
+    char *val = (char *)skiplist_search(sl, 42); // "hello"
+
+    skiplist_erase(sl, 42);
+
+    skiplist_destroy(sl);
+}
 ```
 
-## Compilation
+Because all functions are `static`, you can only include **one** skiplist header per `.c` file. If you need two implementations in the same binary, put each in its own `.c` file.
 
-To compile the project:
+## Building
+
 ```bash
-make all
+# Sequential
+gcc -O2 -std=c11 your_file.c
+
+# The rest
+gcc -O2 -std=c11 -fopenmp your_file.c
+
 ```
 
-## Running Benchmarks
+## Configuration
 
-To execute the benchmarks and generate data:
-```bash
-make small-bench
+At the top of each header:
+
+```c
+#define SKIPLIST_MAX_LEVEL 16   // maximum height of a node (default 16)
+#define SKIPLIST_P         0.5  // probability of level promotion (default 0.5)
 ```
 
-## Running Automated Benchmarks On Nebula
+Feel free to change these.
 
-To execute the benchmarks and generate data:
-```bash
-run_nebula.sh project.zip small-bench
-```
-
-1. **Compile the project:**
-   ```bash
-   make all
-   ```
-2. **Run benchmarks and generate plots:**
-   ```bash
-   make small-bench
-   make small-plot
-   ```
+## References
+The implementation of the Lazy and Lock-Free Skiplists in based on Chapter 15 of *The Art of Multiprocessor Programming* by **Nir Shavit & Maurice Herlihy**
