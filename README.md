@@ -1,7 +1,6 @@
 # Concurrent Skip List Implementations
 
 Four header-only skip list implementations. Drop the `.h` into your project and include it, and you are done.
-**NOTE:** Only works on Linux, as Windows does not allow the use of initstate_r.
 
 ## Implementations
 
@@ -60,6 +59,9 @@ gcc -O2 -std=c11 -fopenmp your_file.c
 
 ```
 
+## Notes
+Only works on Linux, as Windows does not allow the use of initstate_r.
+There could be bugs in the code, so please feel free point them out.
 ## Configuration
 
 At the top of each header:
